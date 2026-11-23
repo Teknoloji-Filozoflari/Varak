@@ -142,3 +142,9 @@ pub async fn apply_cover_from_url(
 pub fn read_library_file(path: String) -> Result<Vec<u8>, DbError> {
     std::fs::read(&path).map_err(DbError::from)
 }
+
+#[tauri::command]
+pub fn extract_epub_cover(state: State<DbState>, id: String) -> Result<Book, DbError> {
+    let conn = state.conn.lock().map_err(|e| DbError::Message(e.to_string()))?;
+    db::extract_cover_from_epub(&conn, &id)
+}

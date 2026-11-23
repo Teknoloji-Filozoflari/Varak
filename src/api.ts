@@ -49,6 +49,7 @@ export const api = {
     invoke<Book>("apply_cover_from_url", { bookId, url }),
   readLibraryFile: (path: string) =>
     invoke<number[]>("read_library_file", { path }),
+  extractEpubCover: (id: string) => invoke<Book>("extract_epub_cover", { id }),
 };
 
 export async function fileToBlobUrl(

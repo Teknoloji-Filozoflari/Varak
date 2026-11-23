@@ -230,6 +230,24 @@ export function BookDetail({ book, onChange, onBack, onRead, onDeleted }: Props)
             Tür: {draft.fileType === "physical" ? "Fiziksel" : draft.fileType.toUpperCase()}
             {draft.filePath ? " · dosya yönetilen kitaplıkta" : ""}
           </p>
+          {draft.fileType === "epub" && draft.filePath && (
+            <button
+              type="button"
+              className="btn"
+              onClick={async () => {
+                try {
+                  const next = await api.extractEpubCover(draft.id);
+                  setDraft(next);
+                  onChange(next);
+                  setMessage("Kapak EPUB dosyasından alındı.");
+                } catch (err) {
+                  setMessage(String(err));
+                }
+              }}
+            >
+              Kapak çıkar
+            </button>
+          )}
           <div className="row">
             {draft.tags.map((t) => (
               <span className="tag-chip" key={t}>

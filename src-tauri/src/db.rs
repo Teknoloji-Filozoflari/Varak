@@ -424,15 +424,24 @@ pub fn import_file(
             .unwrap_or("Adsız kitap")
             .to_string()
     });
+    let mut cover_path: Option<String> = None;
+    if matches!(file_type, FileType::Epub) {
+        let covers = library.join("covers");
+        if let Some(path) = crate::cover::extract_epub_cover(&dest, &covers, &id) {
+            cover_path = Some(path.to_string_lossy().to_string());
+        }
+    }
+
     let ts = now();
     conn.execute(
         "INSERT INTO books (id, title, author, isbn, status, rating, review, progress,
             cover_path, file_path, file_type, created_at, updated_at)
-         VALUES (?1, ?2, ?3, NULL, 'okunacak', NULL, NULL, 0, NULL, ?4, ?5, ?6, ?6)",
+         VALUES (?1, ?2, ?3, NULL, 'okunacak', NULL, NULL, 0, ?4, ?5, ?6, ?7, ?7)",
         params![
             id,
             inferred_title,
             author,
+            cover_path,
             dest.to_string_lossy().to_string(),
             file_type.as_str(),
             ts
@@ -539,6 +548,39 @@ pub fn save_position(
     })
 }
 
+pub fn extract_cover_from_epub(conn: &Connection, book_id: &str) -> Result<Book, DbError> {
+    let book = get_book(conn, book_id)?.ok_or_else(|| DbError::Message("Kitap bulunamadı".into()))?;
+    if book.file_type != "epub" {
+        return Err(DbError::Message("Kapak çıkarma yalnızca EPUB için".into()));
+    }
+    let file_path = book
+        .file_path
+        .ok_or_else(|| DbError::Message("EPUB dosya yolu yok".into()))?;
+    let settings = get_settings(conn, &default_data_dir())?;
+    let covers = PathBuf::from(&settings.library_folder).join("covers");
+    let path = crate::cover::extract_epub_cover(Path::new(&file_path), &covers, book_id)
+        .ok_or_else(|| DbError::Message("EPUB içinde kapak bulunamadı".into()))?;
+    update_book(
+        conn,
+        book_id,
+        BookUpdate {
+            cover_path: Some(path.to_string_lossy().to_string()),
+            title: None,
+            author: None,
+            isbn: None,
+            status: None,
+            rating: None,
+            review: None,
+            progress: None,
+            current_page: None,
+            page_count: None,
+            started_at: None,
+            finished_at: None,
+            tags: None,
+        },
+    )
+}
+
 pub fn save_cover_bytes(
     conn: &Connection,
     book_id: &str,
@@ -569,4 +611,27 @@ pub fn save_cover_bytes(
             tags: None,
         },
     )
+}
+
+#[cfg(test)]
+mod import_tests {
+    use super::*;
+
+    #[test]
+    fn import_epub_writes_cover() {
+        let epub = "/tmp/varak-orman.epub";
+        if !std::path::Path::new(epub).exists() {
+            return;
+        }
+        let dir = std::env::temp_dir().join(format!("varak-db-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        let conn = open_db(&dir).unwrap();
+        ensure_defaults(&conn, &dir).unwrap();
+        // Point library folder into temp dir
+        update_settings(&conn, Some(dir.join("library").to_string_lossy().to_string()), None).unwrap();
+        let book = import_file(&conn, epub, Some("Kapak Testi".into()), Some("Test".into())).unwrap();
+        assert_eq!(book.file_type, "epub");
+        let cover = book.cover_path.expect("cover_path");
+        assert!(std::path::Path::new(&cover).exists(), "{cover}");
+    }
 }

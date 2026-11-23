@@ -1,4 +1,5 @@
 mod commands;
+mod cover;
 mod db;
 mod metadata;
 mod models;
@@ -39,6 +40,7 @@ pub fn run() {
             commands::search_online_metadata,
             commands::apply_cover_from_url,
             commands::read_library_file,
+            commands::extract_epub_cover,
         ])
         .run(tauri::generate_context!())
         .expect("Varak başlatılamadı");

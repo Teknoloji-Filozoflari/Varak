@@ -400,11 +400,65 @@ button {
 
 .reader-bar {
   display: flex;
-  gap: 0.6rem;
+  gap: 0.55rem;
   align-items: center;
-  padding: 0.7rem 1rem;
+  flex-wrap: wrap;
+  padding: 0.65rem 1rem;
   border-bottom: 1px solid var(--line);
   background: var(--surface);
+}
+
+.reader-title {
+  display: flex;
+  flex-direction: column;
+  gap: 0.1rem;
+  min-width: 140px;
+  max-width: 280px;
+}
+
+.reader-title strong {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.reader-hint {
+  font-size: 0.72rem;
+}
+
+.reader-tools {
+  margin-left: auto;
+}
+
+.reader-page-jump {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+}
+
+.reader-page-jump label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+.reader-page-jump input {
+  width: 3.2rem;
+  border: 1px solid var(--line);
+  background: var(--surface-solid);
+  border-radius: 8px;
+  padding: 0.3rem 0.4rem;
+  text-align: center;
+}
+
+.reader-select {
+  border: 1px solid var(--line);
+  background: var(--surface-solid);
+  border-radius: 999px;
+  padding: 0.4rem 0.75rem;
+  max-width: 180px;
 }
 
 .reader-stage {
@@ -413,7 +467,7 @@ button {
   background: #1a1a1a;
 }
 
-[data-theme="light"] .reader-stage {
+[data-theme="light"] .reader-stage:not(.epub-stage) {
   background: #2a2a2a;
 }
 
@@ -423,17 +477,55 @@ button {
   margin: 0 auto;
 }
 
+.pdf-page-wrap {
+  position: relative;
+  width: fit-content;
+  margin: 1rem auto;
+  box-shadow: var(--shadow);
+}
+
+.pdf-text-layer {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  line-height: 1;
+  opacity: 0.25;
+  mixed-blend-mode: multiply;
+}
+
+.pdf-text-layer span {
+  position: absolute;
+  white-space: pre;
+  color: transparent;
+  transform-origin: 0% 0%;
+  cursor: text;
+}
+
+.pdf-text-layer ::selection {
+  background: rgba(12, 107, 82, 0.45);
+  color: transparent;
+}
+
 #epub-root {
   height: 100%;
   width: 100%;
+}
+
+.epub-stage #epub-root {
+  min-height: 100%;
 }
 
 .reader-notes {
   border-top: 1px solid var(--line);
   background: var(--surface);
   padding: 0.75rem 1rem;
-  max-height: 180px;
+  max-height: 200px;
   overflow: auto;
+}
+
+.reader-selection {
+  margin: 0 0 0.45rem;
+  font-size: 0.85rem;
 }
 
 .note-list {
@@ -450,6 +542,14 @@ button {
   border-radius: 8px;
   background: var(--accent-soft);
   font-size: 0.9rem;
+}
+
+.note-jump {
+  border: 0;
+  background: transparent;
+  text-align: left;
+  flex: 1;
+  padding: 0;
 }
 
 .stars {
