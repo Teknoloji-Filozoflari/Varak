@@ -4,16 +4,17 @@ Yerel öncelikli Linux masaüstü kitaplık ve okuma uygulaması.
 
 **Yığın:** Tauri 2 · React · TypeScript · SQLite
 
-## Özellikler (MVP)
+## Özellikler
 
 - Raflar: Okunacak, Okuyorum, Okudum, Yarım bıraktım
-- Fiziksel kitap ekleme; PDF/EPUB içe aktarma (kaynak dosyaya dokunulmaz)
+- Fiziksel kitap ekleme; PDF/EPUB içe aktarma (önizleme, yinelenen uyarı; kaynak dosyaya dokunulmaz)
+- EPUB kapak çıkarma; PDF/EPUB okuyucular (yakınlaştırma / yazı / tema, not–vurgu)
 - Arama / filtre, etiketler, puan, inceleme, ilerleme ve tarihler
-- PDF (pdf.js) ve EPUB (epub.js) okuyucular; konum kalıcı
-- Vurgu / not / yer imi — kaynak dosya değiştirilmez
+- Yedek `.varakbak` (manifest + SHA-256), JSON/CSV dışa aktarma, değiştir/birleştir geri yükleme
+- İstatistikler (okunan kitap/sayfa, aylık–yıllık)
 - SQLite metadata; yapılandırılabilir kitaplık klasörü
 - Türkçe arayüz; açık/koyu tema
-- Open Library + Google Books metadata (çevrimdışıda yumuşak hata)
+- Soft-fail Open Library + Google Books (yalnızca ISBN/başlık/yazar; dosya içeriği gönderilmez)
 
 ## Geliştirme
 
@@ -29,4 +30,4 @@ Veri: `~/.local/share/varak/` (`varak.db` + `library/`).
 
 ## Paketleme
 
-deb / AUR / Nix / AppImage / Flatpak / RPM — ertelendi; önce çalışan MVP.
+Durum ve doğrulanmamış formatlar: [docs/packaging.md](docs/packaging.md).

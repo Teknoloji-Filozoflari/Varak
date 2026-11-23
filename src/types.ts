@@ -14,6 +14,7 @@ export interface Book {
   coverPath: string | null;
   filePath: string | null;
   fileType: FileType | string;
+  fileHash: string | null;
   pageCount: number | null;
   currentPage: number | null;
   startedAt: string | null;
@@ -91,6 +92,102 @@ export interface MetadataResult {
   isbn: string | null;
   coverUrl: string | null;
   source: string;
+}
+
+export interface BackupFileEntry {
+  path: string;
+  sha256: string;
+  bytes: number;
+}
+
+export interface BackupManifest {
+  format: string;
+  version: number;
+  appVersion: string;
+  createdAt: string;
+  bookCount: number;
+  annotationCount: number;
+  contents: string[];
+  files: BackupFileEntry[];
+}
+
+export interface BackupConflict {
+  incomingId: string;
+  incomingTitle: string;
+  reason: string;
+  existingId: string | null;
+  existingTitle: string | null;
+}
+
+export interface BackupPreview {
+  path: string;
+  manifest: BackupManifest;
+  integrityOk: boolean;
+  integrityErrors: string[];
+  conflicts: BackupConflict[];
+  compatible: boolean;
+  compatibilityMessage: string | null;
+}
+
+export interface RestoreOptions {
+  mode: "replace" | "merge" | string;
+  conflictResolutions?: Record<string, string> | null;
+}
+
+export interface RestoreResult {
+  mode: string;
+  importedBooks: number;
+  skipped: number;
+  replaced: number;
+  message: string;
+}
+
+export interface PeriodStat {
+  period: string;
+  booksFinished: number;
+  pagesRead: number;
+}
+
+export interface LibraryStats {
+  totalBooks: number;
+  readBooks: number;
+  readingBooks: number;
+  toReadBooks: number;
+  abandonedBooks: number;
+  pagesRead: number;
+  annotations: number;
+  highlights: number;
+  notes: number;
+  bookmarks: number;
+  monthly: PeriodStat[];
+  yearly: PeriodStat[];
+}
+
+export interface DuplicateMatch {
+  bookId: string;
+  title: string;
+  author: string | null;
+  matchType: string;
+}
+
+export interface ImportPreview {
+  path: string;
+  title: string;
+  author: string | null;
+  isbn: string | null;
+  fileType: string;
+  fileHash: string;
+  fileSize: number;
+  duplicates: DuplicateMatch[];
+  hasEmbeddedCover: boolean;
+}
+
+export interface ConfirmImport {
+  path: string;
+  title: string;
+  author?: string | null;
+  isbn?: string | null;
+  importDespiteDuplicates: boolean;
 }
 
 export const STATUS_LABELS: Record<string, string> = {

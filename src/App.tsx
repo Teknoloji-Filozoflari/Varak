@@ -1,15 +1,24 @@
 import { open } from "@tauri-apps/plugin-dialog";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { api } from "./api";
+import { BackupPanel } from "./components/BackupPanel";
 import { BookCard } from "./components/BookCard";
 import { BookDetail } from "./components/BookDetail";
 import { BookForm } from "./components/BookForm";
 import { EpubReader } from "./components/EpubReader";
+import { ImportPreviewModal } from "./components/ImportPreviewModal";
 import { PdfReader } from "./components/PdfReader";
 import { SettingsPanel } from "./components/SettingsPanel";
-import { STATUS_LABELS, STATUS_OPTIONS, type AppSettings, type Book } from "./types";
+import { StatsPanel } from "./components/StatsPanel";
+import {
+  STATUS_LABELS,
+  STATUS_OPTIONS,
+  type AppSettings,
+  type Book,
+  type ImportPreview,
+} from "./types";
 
-type View = "library" | "add" | "detail" | "settings";
+type View = "library" | "add" | "detail" | "settings" | "backup" | "stats";
 
 function resolveTheme(theme: string): "light" | "dark" {
   if (theme === "light" || theme === "dark") return theme;
@@ -28,6 +37,7 @@ export default function App() {
   const [settings, setSettings] = useState<AppSettings | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [importPreview, setImportPreview] = useState<ImportPreview | null>(null);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -70,7 +80,6 @@ export default function App() {
   const counts = useMemo(() => {
     const map: Record<string, number> = { all: books.length };
     for (const s of STATUS_OPTIONS) map[s] = 0;
-    // counts from filtered list are imperfect; keep simple from current list
     for (const b of books) map[b.status] = (map[b.status] || 0) + 1;
     return map;
   }, [books]);
@@ -82,10 +91,8 @@ export default function App() {
     });
     if (typeof selectedPath !== "string") return;
     try {
-      const book = await api.importBookFile(selectedPath);
-      setSelected(book);
-      setView("detail");
-      await refresh();
+      const preview = await api.previewImport(selectedPath);
+      setImportPreview(preview);
     } catch (err) {
       setError(String(err));
     }
@@ -141,6 +148,12 @@ export default function App() {
           </button>
           <button className="btn" onClick={() => void importFile()}>
             PDF/EPUB içe aktar
+          </button>
+          <button className="btn btn-ghost" onClick={() => setView("stats")}>
+            İstatistikler
+          </button>
+          <button className="btn btn-ghost" onClick={() => setView("backup")}>
+            Yedek
           </button>
           <button className="btn btn-ghost" onClick={() => setView("settings")}>
             Ayarlar
@@ -211,8 +224,15 @@ export default function App() {
                 document.documentElement.setAttribute("data-theme", resolveTheme(s.theme));
               }}
               onClose={() => setView("library")}
+              onOpenBackup={() => setView("backup")}
             />
           )}
+
+          {view === "backup" && (
+            <BackupPanel onDone={() => void refresh()} onClose={() => setView("library")} />
+          )}
+
+          {view === "stats" && <StatsPanel onClose={() => setView("library")} />}
 
           {view === "detail" && selected && (
             <BookDetail
@@ -268,6 +288,19 @@ export default function App() {
           )}
         </main>
       </div>
+
+      {importPreview && (
+        <ImportPreviewModal
+          preview={importPreview}
+          onCancel={() => setImportPreview(null)}
+          onImported={(book) => {
+            setImportPreview(null);
+            setSelected(book);
+            setView("detail");
+            void refresh();
+          }}
+        />
+      )}
     </div>
   );
 }

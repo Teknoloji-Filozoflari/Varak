@@ -1,8 +1,10 @@
+use crate::backup;
 use crate::db::{self, DbError, DbState};
 use crate::metadata::{self, MetaError};
 use crate::models::{
-    Annotation, AnnotationInput, AppSettings, Book, BookFilter, BookInput, BookUpdate,
-    MetadataResult, ReadingPosition,
+    Annotation, AnnotationInput, AppSettings, BackupManifest, BackupPreview, Book, BookFilter,
+    BookInput, BookUpdate, ConfirmImport, ImportPreview, LibraryStats, MetadataResult,
+    ReadingPosition, RestoreOptions, RestoreResult,
 };
 use tauri::State;
 
@@ -49,6 +51,18 @@ pub fn import_book_file(
 ) -> Result<Book, DbError> {
     let conn = state.conn.lock().map_err(|e| DbError::Message(e.to_string()))?;
     db::import_file(&conn, &path, title, author)
+}
+
+#[tauri::command]
+pub fn preview_import(state: State<DbState>, path: String) -> Result<ImportPreview, DbError> {
+    let conn = state.conn.lock().map_err(|e| DbError::Message(e.to_string()))?;
+    db::preview_import(&conn, &path)
+}
+
+#[tauri::command]
+pub fn confirm_import(state: State<DbState>, input: ConfirmImport) -> Result<Book, DbError> {
+    let conn = state.conn.lock().map_err(|e| DbError::Message(e.to_string()))?;
+    db::confirm_import(&conn, input)
 }
 
 #[tauri::command]
@@ -147,4 +161,39 @@ pub fn read_library_file(path: String) -> Result<Vec<u8>, DbError> {
 pub fn extract_epub_cover(state: State<DbState>, id: String) -> Result<Book, DbError> {
     let conn = state.conn.lock().map_err(|e| DbError::Message(e.to_string()))?;
     db::extract_cover_from_epub(&conn, &id)
+}
+
+#[tauri::command]
+pub fn create_backup(state: State<DbState>, dest_path: String) -> Result<BackupManifest, DbError> {
+    backup::create_backup(&state, &dest_path)
+}
+
+#[tauri::command]
+pub fn inspect_backup(state: State<DbState>, path: String) -> Result<BackupPreview, DbError> {
+    backup::inspect_backup(&state, &path)
+}
+
+#[tauri::command]
+pub fn restore_backup(
+    state: State<DbState>,
+    path: String,
+    options: RestoreOptions,
+) -> Result<RestoreResult, DbError> {
+    backup::restore_backup(&state, &path, options)
+}
+
+#[tauri::command]
+pub fn export_library_json(state: State<DbState>, dest_path: String) -> Result<(), DbError> {
+    backup::export_json(&state, &dest_path)
+}
+
+#[tauri::command]
+pub fn export_library_csv(state: State<DbState>, dest_path: String) -> Result<(), DbError> {
+    backup::export_csv(&state, &dest_path)
+}
+
+#[tauri::command]
+pub fn get_statistics(state: State<DbState>) -> Result<LibraryStats, DbError> {
+    let conn = state.conn.lock().map_err(|e| DbError::Message(e.to_string()))?;
+    db::get_statistics(&conn)
 }

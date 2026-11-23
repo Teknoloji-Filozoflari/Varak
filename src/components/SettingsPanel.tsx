@@ -7,9 +7,10 @@ interface Props {
   settings: AppSettings;
   onChange: (settings: AppSettings) => void;
   onClose: () => void;
+  onOpenBackup?: () => void;
 }
 
-export function SettingsPanel({ settings, onChange, onClose }: Props) {
+export function SettingsPanel({ settings, onChange, onClose, onOpenBackup }: Props) {
   const [theme, setTheme] = useState(settings.theme);
   const [folder, setFolder] = useState(settings.libraryFolder);
   const [msg, setMsg] = useState<string | null>(null);
@@ -55,6 +56,11 @@ export function SettingsPanel({ settings, onChange, onClose }: Props) {
           PDF/EPUB dosyaları buraya kopyalanır; kaynak dosyalarınız olduğu gibi kalır. Metadata ve
           vurgular SQLite içinde tutulur.
         </p>
+        {onOpenBackup && (
+          <button type="button" className="btn" onClick={onOpenBackup}>
+            Yedekleme / dışa aktarma / geri yükleme
+          </button>
+        )}
         {msg && <p className="muted">{msg}</p>}
         <div className="row">
           <button className="btn btn-primary" onClick={save}>

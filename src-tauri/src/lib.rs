@@ -1,6 +1,9 @@
+mod backup;
 mod commands;
 mod cover;
 mod db;
+mod epub_meta;
+mod hashutil;
 mod metadata;
 mod models;
 
@@ -29,6 +32,8 @@ pub fn run() {
             commands::update_book,
             commands::delete_book,
             commands::import_book_file,
+            commands::preview_import,
+            commands::confirm_import,
             commands::list_tags,
             commands::get_settings,
             commands::update_settings,
@@ -41,6 +46,12 @@ pub fn run() {
             commands::apply_cover_from_url,
             commands::read_library_file,
             commands::extract_epub_cover,
+            commands::create_backup,
+            commands::inspect_backup,
+            commands::restore_backup,
+            commands::export_library_json,
+            commands::export_library_csv,
+            commands::get_statistics,
         ])
         .run(tauri::generate_context!())
         .expect("Varak başlatılamadı");

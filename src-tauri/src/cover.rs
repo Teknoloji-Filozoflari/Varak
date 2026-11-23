@@ -2,6 +2,15 @@ use std::io::{Read, Write};
 use std::path::{Path, PathBuf};
 use zip::ZipArchive;
 
+pub fn epub_has_cover_hint(opf: &str) -> bool {
+    let lower = opf.to_lowercase();
+    lower.contains("name=\"cover\"")
+        || lower.contains("name='cover'")
+        || lower.contains("properties=\"cover-image\"")
+        || lower.contains("properties='cover-image'")
+        || (lower.contains("cover") && lower.contains("media-type=\"image/"))
+}
+
 /// Extract an EPUB cover image into `covers_dir/{book_id}.{ext}`.
 /// Returns the written path when a cover is found.
 pub fn extract_epub_cover(

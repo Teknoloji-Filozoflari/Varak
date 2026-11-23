@@ -580,6 +580,79 @@ button {
   }
 }
 
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  background: rgba(10, 16, 14, 0.55);
+  display: grid;
+  place-items: center;
+  padding: 1rem;
+  animation: rise-in 0.2s ease both;
+}
+
+.modal-panel {
+  width: min(560px, 100%);
+  max-height: min(90vh, 820px);
+  overflow: auto;
+}
+
+.dupe-box {
+  border: 1px solid color-mix(in srgb, var(--danger) 35%, var(--line));
+  background: color-mix(in srgb, var(--danger) 8%, var(--surface-solid));
+  border-radius: 12px;
+  padding: 0.75rem 0.9rem;
+}
+
+.dupe-box ul {
+  margin: 0.4rem 0 0.6rem;
+  padding-left: 1.1rem;
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 0.75rem;
+}
+
+.stat-card {
+  background: var(--surface-solid);
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 0.75rem 0.85rem;
+}
+
+.stat-value {
+  font-family: var(--font-display);
+  font-size: 1.55rem;
+  font-weight: 650;
+  color: var(--accent);
+}
+
+.stat-label {
+  color: var(--muted);
+  font-size: 0.82rem;
+  margin-top: 0.15rem;
+}
+
+.stats-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.92rem;
+}
+
+.stats-table th,
+.stats-table td {
+  text-align: left;
+  padding: 0.4rem 0.5rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.stats-table th {
+  color: var(--muted);
+  font-weight: 600;
+}
+
 @media (max-width: 860px) {
   .main {
     grid-template-columns: 1fr;
