@@ -10,6 +10,7 @@ import { ImportPreviewModal } from "./components/ImportPreviewModal";
 import { PdfReader } from "./components/PdfReader";
 import { SettingsPanel } from "./components/SettingsPanel";
 import { StatsPanel } from "./components/StatsPanel";
+import { isReadableBook, normalizeFileType } from "./lib/books";
 import {
   STATUS_LABELS,
   STATUS_OPTIONS,
@@ -103,8 +104,22 @@ export default function App() {
     setView("detail");
   }
 
+  function startReading(book: Book) {
+    if (!isReadableBook(book)) {
+      setSelected(book);
+      setView("detail");
+      setError(
+        "Bu kitapta okunabilir PDF/EPUB yok. Detayda “PDF/EPUB bağla ve oku” ile dosya ekleyin.",
+      );
+      return;
+    }
+    setError(null);
+    setReading(book);
+  }
+
   if (reading) {
-    if (reading.fileType === "pdf") {
+    const kind = normalizeFileType(reading.fileType);
+    if (kind === "pdf") {
       return (
         <PdfReader
           book={reading}
@@ -119,7 +134,7 @@ export default function App() {
         />
       );
     }
-    if (reading.fileType === "epub") {
+    if (kind === "epub") {
       return (
         <EpubReader
           book={reading}
@@ -134,6 +149,19 @@ export default function App() {
         />
       );
     }
+    return (
+      <div className="app-shell">
+        <div className="panel" style={{ margin: "2rem auto", maxWidth: 480 }}>
+          <h2>Okuyucu açılamadı</h2>
+          <p className="muted">
+            Desteklenmeyen veya eksik dosya türü: {reading.fileType || "bilinmiyor"}.
+          </p>
+          <button className="btn btn-primary" onClick={() => setReading(null)}>
+            Kütüphaneye dön
+          </button>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -242,7 +270,7 @@ export default function App() {
                 setSelected(b);
                 void refresh();
               }}
-              onRead={(b) => setReading(b)}
+              onRead={startReading}
               onDeleted={() => {
                 setSelected(null);
                 setView("library");
@@ -264,6 +292,10 @@ export default function App() {
                   Yenile
                 </button>
               </div>
+              <p className="muted" style={{ marginTop: 0 }}>
+                PDF/EPUB için karttaki <strong>Oku</strong> düğmesine basın. Fiziksel kayıtlarda önce
+                detaydan dosya bağlayın.
+              </p>
               {error && <p style={{ color: "var(--danger)" }}>{error}</p>}
               {loading ? (
                 <p className="empty">Yükleniyor…</p>
@@ -279,6 +311,7 @@ export default function App() {
                       key={book.id}
                       book={book}
                       onOpen={openBook}
+                      onRead={startReading}
                       style={{ animationDelay: `${Math.min(i, 12) * 40}ms` }}
                     />
                   ))}

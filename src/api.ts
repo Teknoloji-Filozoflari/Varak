@@ -61,6 +61,8 @@ export const api = {
   readLibraryFile: (path: string) =>
     invoke<number[]>("read_library_file", { path }),
   extractEpubCover: (id: string) => invoke<Book>("extract_epub_cover", { id }),
+  attachBookFile: (id: string, path: string) =>
+    invoke<Book>("attach_book_file", { id, path }),
   createBackup: (destPath: string) =>
     invoke<BackupManifest>("create_backup", { destPath }),
   inspectBackup: (path: string) =>

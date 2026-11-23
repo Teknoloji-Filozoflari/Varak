@@ -88,6 +88,10 @@ export function BookForm({ onCreated, onCancel }: Props) {
   return (
     <div className="panel">
       <h2>Fiziksel kitap ekle</h2>
+      <p className="muted">
+        Bu form yalnızca kayıt oluşturur; uygulama içi okuyucu açmaz. PDF/EPUB okumak için üstteki
+        “PDF/EPUB içe aktar”ı kullanın veya kaydı açıp dosya bağlayın.
+      </p>
       <form className="form-grid" onSubmit={submit}>
         <label>
           Başlık

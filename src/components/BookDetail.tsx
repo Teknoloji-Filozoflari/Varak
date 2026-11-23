@@ -1,5 +1,7 @@
+import { open } from "@tauri-apps/plugin-dialog";
 import { useEffect, useState } from "react";
 import { api, assetUrl } from "../api";
+import { isReadableBook, normalizeFileType } from "../lib/books";
 import {
   STATUS_LABELS,
   STATUS_OPTIONS,
@@ -20,6 +22,7 @@ export function BookDetail({ book, onChange, onBack, onRead, onDeleted }: Props)
   const [tags, setTags] = useState(book.tags.join(", "));
   const [saving, setSaving] = useState(false);
   const [metaBusy, setMetaBusy] = useState(false);
+  const [attachBusy, setAttachBusy] = useState(false);
   const [results, setResults] = useState<MetadataResult[]>([]);
   const [message, setMessage] = useState<string | null>(null);
 
@@ -29,7 +32,9 @@ export function BookDetail({ book, onChange, onBack, onRead, onDeleted }: Props)
   }, [book]);
 
   const cover = assetUrl(draft.coverPath);
-  const canRead = draft.fileType === "pdf" || draft.fileType === "epub";
+  const kind = normalizeFileType(draft.fileType);
+  const canRead = isReadableBook(draft);
+  const isPhysical = kind === "physical" || !draft.filePath;
 
   async function save() {
     setSaving(true);
@@ -103,15 +108,43 @@ export function BookDetail({ book, onChange, onBack, onRead, onDeleted }: Props)
     onDeleted();
   }
 
+  async function attachFile() {
+    const selectedPath = await open({
+      multiple: false,
+      filters: [{ name: "Kitap", extensions: ["pdf", "epub"] }],
+    });
+    if (typeof selectedPath !== "string") return;
+    setAttachBusy(true);
+    setMessage(null);
+    try {
+      const next = await api.attachBookFile(draft.id, selectedPath);
+      setDraft(next);
+      onChange(next);
+      setMessage("PDF/EPUB bağlandı. Artık Oku ile açabilirsiniz.");
+    } catch (err) {
+      setMessage(String(err));
+    } finally {
+      setAttachBusy(false);
+    }
+  }
+
   return (
     <div className="panel">
       <div className="row" style={{ marginBottom: "1rem" }}>
         <button className="btn btn-ghost" onClick={onBack}>
           ← Kütüphane
         </button>
-        {canRead && (
-          <button className="btn btn-primary" onClick={() => onRead(draft)}>
+        {canRead ? (
+          <button className="btn btn-primary btn-oku" onClick={() => onRead(draft)}>
             Oku
+          </button>
+        ) : (
+          <button
+            className="btn btn-primary"
+            disabled={attachBusy}
+            onClick={() => void attachFile()}
+          >
+            {attachBusy ? "Bağlanıyor…" : "PDF/EPUB bağla ve oku"}
           </button>
         )}
         <button className="btn" onClick={save} disabled={saving}>
@@ -121,6 +154,20 @@ export function BookDetail({ book, onChange, onBack, onRead, onDeleted }: Props)
           Sil
         </button>
       </div>
+
+      {!canRead && (
+        <p className="reader-hint-banner">
+          {isPhysical
+            ? "Bu kayıt fiziksel kitap olarak eklendi; uygulama içi okuyucu yok. Sahip olduğunuz PDF veya EPUB dosyasını “PDF/EPUB bağla ve oku” ile ekleyin (kaynak dosya kopyalanır, orijinal dokunulmaz)."
+            : "Okunabilir dosya yolu eksik. PDF/EPUB bağlayarak okuyucuyu açabilirsiniz."}
+        </p>
+      )}
+      {canRead && (
+        <p className="muted" style={{ marginTop: 0 }}>
+          Okumak için yeşil <strong>Oku</strong> düğmesine basın — veya kütüphanedeki karttaki Oku’yu
+          kullanın.
+        </p>
+      )}
 
       <div className="detail-layout">
         <div className="detail-cover">
@@ -227,10 +274,28 @@ export function BookDetail({ book, onChange, onBack, onRead, onDeleted }: Props)
             />
           </label>
           <p className="muted">
-            Tür: {draft.fileType === "physical" ? "Fiziksel" : draft.fileType.toUpperCase()}
+            Tür:{" "}
+            {kind === "physical"
+              ? "Fiziksel (okuyucu yok — dosya bağlayın)"
+              : draft.fileType.toUpperCase()}
             {draft.filePath ? " · dosya yönetilen kitaplıkta" : ""}
           </p>
-          {draft.fileType === "epub" && draft.filePath && (
+          {canRead && (
+            <button type="button" className="btn btn-primary" onClick={() => onRead(draft)}>
+              Okumaya başla
+            </button>
+          )}
+          {!canRead && (
+            <button
+              type="button"
+              className="btn"
+              disabled={attachBusy}
+              onClick={() => void attachFile()}
+            >
+              {attachBusy ? "Bağlanıyor…" : "PDF veya EPUB dosyası seç"}
+            </button>
+          )}
+          {kind === "epub" && draft.filePath && (
             <button
               type="button"
               className="btn"

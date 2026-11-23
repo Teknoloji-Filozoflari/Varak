@@ -164,6 +164,16 @@ pub fn extract_epub_cover(state: State<DbState>, id: String) -> Result<Book, DbE
 }
 
 #[tauri::command]
+pub fn attach_book_file(
+    state: State<DbState>,
+    id: String,
+    path: String,
+) -> Result<Book, DbError> {
+    let conn = state.conn.lock().map_err(|e| DbError::Message(e.to_string()))?;
+    db::attach_book_file(&conn, &id, &path)
+}
+
+#[tauri::command]
 pub fn create_backup(state: State<DbState>, dest_path: String) -> Result<BackupManifest, DbError> {
     backup::create_backup(&state, &dest_path)
 }

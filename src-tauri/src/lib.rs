@@ -46,6 +46,7 @@ pub fn run() {
             commands::apply_cover_from_url,
             commands::read_library_file,
             commands::extract_epub_cover,
+            commands::attach_book_file,
             commands::create_backup,
             commands::inspect_backup,
             commands::restore_backup,

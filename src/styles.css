@@ -208,6 +208,13 @@ button {
   gap: 1rem;
 }
 
+.book-card-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  animation: rise-in 0.45s ease both;
+}
+
 .book-card {
   border: 0;
   background: transparent;
@@ -216,7 +223,39 @@ button {
   display: flex;
   flex-direction: column;
   gap: 0.55rem;
-  animation: rise-in 0.45s ease both;
+  width: 100%;
+}
+
+.book-card-read {
+  width: 100%;
+}
+
+.cover-kind {
+  position: absolute;
+  left: 0.45rem;
+  bottom: 0.45rem;
+  font-size: 0.68rem;
+  letter-spacing: 0.04em;
+  padding: 0.15rem 0.4rem;
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+}
+
+.btn-oku {
+  min-width: 5.5rem;
+  font-weight: 600;
+}
+
+.reader-hint-banner {
+  margin: 0 0 1rem;
+  padding: 0.75rem 0.9rem;
+  border-radius: 12px;
+  background: var(--accent-soft);
+  border: 1px solid color-mix(in srgb, var(--accent) 30%, var(--line));
+  color: var(--ink);
+  font-size: 0.92rem;
+  line-height: 1.4;
 }
 
 .cover {
@@ -234,9 +273,10 @@ button {
   transition: transform 0.2s ease;
 }
 
-.book-card:hover .cover {
+.book-card-wrap:hover .cover {
   transform: translateY(-4px) scale(1.01);
 }
+
 
 .cover img {
   width: 100%;

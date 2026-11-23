@@ -420,6 +420,65 @@ pub fn delete_book(conn: &Connection, id: &str) -> Result<(), DbError> {
     Ok(())
 }
 
+/// Attach a PDF/EPUB file to an existing book (e.g. physical entry → readable).
+pub fn attach_book_file(conn: &Connection, book_id: &str, source_path: &str) -> Result<Book, DbError> {
+    let existing = get_book(conn, book_id)?.ok_or_else(|| DbError::Message("Kitap bulunamadı".into()))?;
+    let source = PathBuf::from(source_path);
+    if !source.exists() {
+        return Err(DbError::Message("Dosya bulunamadı".into()));
+    }
+    let ext = source
+        .extension()
+        .and_then(|e| e.to_str())
+        .unwrap_or("")
+        .to_lowercase();
+    let file_type = match ext.as_str() {
+        "pdf" => FileType::Pdf,
+        "epub" => FileType::Epub,
+        _ => {
+            return Err(DbError::Message(
+                "Yalnızca PDF veya EPUB dosyası bağlanabilir".into(),
+            ))
+        }
+    };
+    let file_hash = sha256_file(&source).map_err(DbError::Message)?;
+
+    let settings = get_settings(conn, &default_data_dir())?;
+    let library = PathBuf::from(&settings.library_folder);
+    fs::create_dir_all(&library)?;
+
+    // Remove previous managed file if present
+    if let Some(old) = &existing.file_path {
+        let _ = fs::remove_file(old);
+    }
+
+    let dest = library.join(format!("{book_id}.{ext}"));
+    fs::copy(&source, &dest)?;
+
+    let mut cover_path = existing.cover_path.clone();
+    if matches!(file_type, FileType::Epub) && cover_path.is_none() {
+        let covers = library.join("covers");
+        if let Some(path) = crate::cover::extract_epub_cover(&dest, &covers, book_id) {
+            cover_path = Some(path.to_string_lossy().to_string());
+        }
+    }
+
+    let ts = now();
+    conn.execute(
+        "UPDATE books SET file_path=?2, file_type=?3, file_hash=?4, cover_path=?5, updated_at=?6
+         WHERE id=?1",
+        params![
+            book_id,
+            dest.to_string_lossy().to_string(),
+            file_type.as_str(),
+            file_hash,
+            cover_path,
+            ts
+        ],
+    )?;
+    get_book(conn, book_id)?.ok_or_else(|| DbError::Message("Dosya bağlanamadı".into()))
+}
+
 pub fn preview_import(conn: &Connection, source_path: &str) -> Result<ImportPreview, DbError> {
     let source = PathBuf::from(source_path);
     if !source.exists() {
