@@ -8,6 +8,7 @@ import {
   type Book,
   type MetadataResult,
 } from "../types";
+import { formatInvokeError, type ToastKind } from "./Toast";
 
 interface Props {
   book: Book;
@@ -15,16 +16,26 @@ interface Props {
   onBack: () => void;
   onRead: (book: Book) => void;
   onDeleted: () => void;
+  onNotify?: (kind: ToastKind, text: string) => void;
 }
 
-export function BookDetail({ book, onChange, onBack, onRead, onDeleted }: Props) {
+export function BookDetail({
+  book,
+  onChange,
+  onBack,
+  onRead,
+  onDeleted,
+  onNotify,
+}: Props) {
   const [draft, setDraft] = useState(book);
   const [tags, setTags] = useState(book.tags.join(", "));
   const [saving, setSaving] = useState(false);
   const [metaBusy, setMetaBusy] = useState(false);
   const [attachBusy, setAttachBusy] = useState(false);
   const [results, setResults] = useState<MetadataResult[]>([]);
-  const [message, setMessage] = useState<string | null>(null);
+  const [banner, setBanner] = useState<{ kind: "success" | "error"; text: string } | null>(
+    null,
+  );
 
   useEffect(() => {
     setDraft(book);
@@ -36,9 +47,17 @@ export function BookDetail({ book, onChange, onBack, onRead, onDeleted }: Props)
   const canRead = isReadableBook(draft);
   const isPhysical = kind === "physical" || !draft.filePath;
 
+  function notify(kind: ToastKind, text: string) {
+    setBanner({
+      kind: kind === "error" ? "error" : "success",
+      text,
+    });
+    onNotify?.(kind, text);
+  }
+
   async function save() {
     setSaving(true);
-    setMessage(null);
+    setBanner(null);
     try {
       const updated = await api.updateBook(draft.id, {
         title: draft.title,
@@ -57,10 +76,11 @@ export function BookDetail({ book, onChange, onBack, onRead, onDeleted }: Props)
           .map((t) => t.trim())
           .filter(Boolean),
       });
+      setDraft(updated);
       onChange(updated);
-      setMessage("Kaydedildi.");
+      notify("success", "Kaydedildi.");
     } catch (err) {
-      setMessage(String(err));
+      notify("error", `Kaydetme başarısız: ${formatInvokeError(err)}`);
     } finally {
       setSaving(false);
     }
@@ -74,9 +94,9 @@ export function BookDetail({ book, onChange, onBack, onRead, onDeleted }: Props)
         draft.isbn || undefined,
       );
       setResults(found);
-      if (!found.length) setMessage("Metadata bulunamadı veya çevrimdışısınız.");
+      if (!found.length) notify("info", "Metadata bulunamadı veya çevrimdışısınız.");
     } catch {
-      setMessage("Çevrimiçi arama başarısız.");
+      notify("error", "Çevrimiçi arama başarısız.");
       setResults([]);
     } finally {
       setMetaBusy(false);
@@ -96,76 +116,117 @@ export function BookDetail({ book, onChange, onBack, onRead, onDeleted }: Props)
         next = await api.applyCoverFromUrl(draft.id, item.coverUrl);
         setDraft(next);
         onChange(next);
+        notify("success", "Kapak uygulandı.");
       } catch {
-        setMessage("Kapak indirilemedi.");
+        notify("error", "Kapak indirilemedi.");
       }
     }
   }
 
   async function remove() {
     if (!confirm(`“${draft.title}” silinsin mi?`)) return;
-    await api.deleteBook(draft.id);
-    onDeleted();
+    try {
+      await api.deleteBook(draft.id);
+      onNotify?.("success", "Kitap silindi.");
+      onDeleted();
+    } catch (err) {
+      notify("error", `Silinemedi: ${formatInvokeError(err)}`);
+    }
   }
 
-  async function attachFile() {
-    const selectedPath = await open({
-      multiple: false,
-      filters: [{ name: "Kitap", extensions: ["pdf", "epub"] }],
-    });
-    if (typeof selectedPath !== "string") return;
+  async function attachFile(andRead: boolean) {
+    let selectedPath: string | string[] | null;
+    try {
+      selectedPath = await open({
+        multiple: false,
+        filters: [{ name: "Kitap", extensions: ["pdf", "epub"] }],
+      });
+    } catch (err) {
+      notify("error", `Dosya seçilemedi: ${formatInvokeError(err)}`);
+      return;
+    }
+    if (selectedPath == null) {
+      notify("info", "Dosya seçimi iptal edildi.");
+      return;
+    }
+    if (typeof selectedPath !== "string") {
+      notify("error", "Geçersiz dosya yolu.");
+      return;
+    }
     setAttachBusy(true);
-    setMessage(null);
+    setBanner(null);
     try {
       const next = await api.attachBookFile(draft.id, selectedPath);
       setDraft(next);
       onChange(next);
-      setMessage("PDF/EPUB bağlandı. Artık Oku ile açabilirsiniz.");
+      notify(
+        "success",
+        "PDF/EPUB kitaplığa kopyalandı. Okuyucu açılıyor…",
+      );
+      if (andRead) {
+        onRead(next);
+      }
     } catch (err) {
-      setMessage(String(err));
+      notify("error", `Dosya bağlanamadı: ${formatInvokeError(err)}`);
     } finally {
       setAttachBusy(false);
     }
   }
 
+  function handleRead() {
+    if (!isReadableBook(draft)) {
+      notify(
+        "error",
+        "Okunabilir PDF/EPUB yok. Önce “PDF/EPUB bağla ve oku” ile dosya ekleyin.",
+      );
+      return;
+    }
+    onNotify?.("info", `“${draft.title}” okuyucuda açılıyor…`);
+    onRead(draft);
+  }
+
   return (
     <div className="panel">
       <div className="row" style={{ marginBottom: "1rem" }}>
-        <button className="btn btn-ghost" onClick={onBack}>
+        <button type="button" className="btn btn-ghost" onClick={onBack}>
           ← Kütüphane
         </button>
         {canRead ? (
-          <button className="btn btn-primary btn-oku" onClick={() => onRead(draft)}>
+          <button type="button" className="btn btn-primary btn-oku" onClick={handleRead}>
             Oku
           </button>
         ) : (
           <button
+            type="button"
             className="btn btn-primary"
             disabled={attachBusy}
-            onClick={() => void attachFile()}
+            onClick={() => void attachFile(true)}
           >
-            {attachBusy ? "Bağlanıyor…" : "PDF/EPUB bağla ve oku"}
+            {attachBusy ? "Kopyalanıyor…" : "PDF/EPUB bağla ve oku"}
           </button>
         )}
-        <button className="btn" onClick={save} disabled={saving}>
+        <button type="button" className="btn" onClick={() => void save()} disabled={saving}>
           {saving ? "Kaydediliyor…" : "Kaydet"}
         </button>
-        <button className="btn btn-danger" onClick={remove}>
+        <button type="button" className="btn btn-danger" onClick={() => void remove()}>
           Sil
         </button>
       </div>
 
+      {banner && (
+        <div className={`inline-banner inline-banner-${banner.kind}`}>{banner.text}</div>
+      )}
+
       {!canRead && (
         <p className="reader-hint-banner">
           {isPhysical
-            ? "Bu kayıt fiziksel kitap olarak eklendi; uygulama içi okuyucu yok. Sahip olduğunuz PDF veya EPUB dosyasını “PDF/EPUB bağla ve oku” ile ekleyin (kaynak dosya kopyalanır, orijinal dokunulmaz)."
+            ? "Bu kayıt fiziksel kitap olarak eklendi; uygulama içi okuyucu yok. Sahip olduğunuz PDF veya EPUB dosyasını “PDF/EPUB bağla ve oku” ile ekleyin — kaynak dosya yönetilen kitaplığa kopyalanır, orijinal dokunulmaz; ardından okuyucu açılır."
             : "Okunabilir dosya yolu eksik. PDF/EPUB bağlayarak okuyucuyu açabilirsiniz."}
         </p>
       )}
       {canRead && (
         <p className="muted" style={{ marginTop: 0 }}>
-          Okumak için yeşil <strong>Oku</strong> düğmesine basın — veya kütüphanedeki karttaki Oku’yu
-          kullanın.
+          Dosya yönetilen kitaplıkta. Okumak için <strong>Oku</strong> düğmesine basın.
         </p>
       )}
 
@@ -209,40 +270,61 @@ export function BookDetail({ book, onChange, onBack, onRead, onDeleted }: Props)
             </select>
           </label>
           <label>
-            Etiketler
-            <input value={tags} onChange={(e) => setTags(e.target.value)} />
+            Puan (0–5)
+            <input
+              type="number"
+              min={0}
+              max={5}
+              value={draft.rating ?? ""}
+              onChange={(e) =>
+                setDraft({
+                  ...draft,
+                  rating: e.target.value === "" ? null : Number(e.target.value),
+                })
+              }
+            />
           </label>
-          <div>
-            <span className="muted">Puan</span>
-            <div className="stars">
-              {[1, 2, 3, 4, 5].map((n) => (
-                <button
-                  key={n}
-                  type="button"
-                  className={`star ${draft.rating && draft.rating >= n ? "on" : ""}`}
-                  onClick={() =>
-                    setDraft({
-                      ...draft,
-                      rating: draft.rating === n ? null : n,
-                    })
-                  }
-                >
-                  ★
-                </button>
-              ))}
-            </div>
-          </div>
           <label>
             İlerleme (%)
             <input
               type="number"
               min={0}
               max={100}
-              value={Math.round(draft.progress)}
+              value={draft.progress}
+              onChange={(e) => setDraft({ ...draft, progress: Number(e.target.value) || 0 })}
+            />
+          </label>
+          <label>
+            Sayfa
+            <input
+              type="number"
+              min={0}
+              value={draft.currentPage ?? ""}
               onChange={(e) =>
-                setDraft({ ...draft, progress: Number(e.target.value) || 0 })
+                setDraft({
+                  ...draft,
+                  currentPage: e.target.value === "" ? null : Number(e.target.value),
+                })
               }
             />
+          </label>
+          <label>
+            Toplam sayfa
+            <input
+              type="number"
+              min={0}
+              value={draft.pageCount ?? ""}
+              onChange={(e) =>
+                setDraft({
+                  ...draft,
+                  pageCount: e.target.value === "" ? null : Number(e.target.value),
+                })
+              }
+            />
+          </label>
+          <label>
+            Etiketler (virgülle)
+            <input value={tags} onChange={(e) => setTags(e.target.value)} />
           </label>
           <div className="row">
             <label style={{ flex: 1 }}>
@@ -281,7 +363,7 @@ export function BookDetail({ book, onChange, onBack, onRead, onDeleted }: Props)
             {draft.filePath ? " · dosya yönetilen kitaplıkta" : ""}
           </p>
           {canRead && (
-            <button type="button" className="btn btn-primary" onClick={() => onRead(draft)}>
+            <button type="button" className="btn btn-primary" onClick={handleRead}>
               Okumaya başla
             </button>
           )}
@@ -290,9 +372,9 @@ export function BookDetail({ book, onChange, onBack, onRead, onDeleted }: Props)
               type="button"
               className="btn"
               disabled={attachBusy}
-              onClick={() => void attachFile()}
+              onClick={() => void attachFile(true)}
             >
-              {attachBusy ? "Bağlanıyor…" : "PDF veya EPUB dosyası seç"}
+              {attachBusy ? "Kopyalanıyor…" : "PDF veya EPUB dosyası seç"}
             </button>
           )}
           {kind === "epub" && draft.filePath && (
@@ -304,9 +386,9 @@ export function BookDetail({ book, onChange, onBack, onRead, onDeleted }: Props)
                   const next = await api.extractEpubCover(draft.id);
                   setDraft(next);
                   onChange(next);
-                  setMessage("Kapak EPUB dosyasından alındı.");
+                  notify("success", "Kapak EPUB dosyasından alındı.");
                 } catch (err) {
-                  setMessage(String(err));
+                  notify("error", formatInvokeError(err));
                 }
               }}
             >
@@ -349,7 +431,6 @@ export function BookDetail({ book, onChange, onBack, onRead, onDeleted }: Props)
               ))}
             </div>
           )}
-          {message && <p className="muted">{message}</p>}
         </div>
       </div>
     </div>

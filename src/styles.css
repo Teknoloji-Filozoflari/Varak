@@ -70,6 +70,81 @@ button {
   grid-template-rows: auto 1fr;
   height: 100%;
   min-height: 100vh;
+  position: relative;
+}
+
+.app-toast {
+  position: fixed;
+  top: 1rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  max-width: min(560px, calc(100vw - 2rem));
+  padding: 0.85rem 1rem;
+  border-radius: 12px;
+  box-shadow: var(--shadow);
+  font-size: 0.95rem;
+  line-height: 1.35;
+  animation: toast-in 0.25s ease both;
+}
+
+.app-toast-success {
+  background: color-mix(in srgb, var(--accent) 18%, var(--surface-solid));
+  border: 1px solid color-mix(in srgb, var(--accent) 45%, var(--line));
+  color: var(--ink);
+}
+
+.app-toast-error {
+  background: color-mix(in srgb, var(--danger) 14%, var(--surface-solid));
+  border: 1px solid color-mix(in srgb, var(--danger) 45%, var(--line));
+  color: var(--ink);
+}
+
+.app-toast-info {
+  background: var(--surface-solid);
+  border: 1px solid var(--line);
+  color: var(--ink);
+}
+
+.app-toast-close {
+  border: 0;
+  background: transparent;
+  font-size: 1.25rem;
+  line-height: 1;
+  padding: 0 0.15rem;
+  color: var(--muted);
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, -8px);
+  }
+  to {
+    opacity: 1;
+    transform: translate(-50%, 0);
+  }
+}
+
+.inline-banner {
+  margin: 0 0 1rem;
+  padding: 0.7rem 0.9rem;
+  border-radius: 12px;
+  font-size: 0.92rem;
+  line-height: 1.4;
+}
+
+.inline-banner-success {
+  background: color-mix(in srgb, var(--accent) 14%, var(--surface-solid));
+  border: 1px solid color-mix(in srgb, var(--accent) 40%, var(--line));
+}
+
+.inline-banner-error {
+  background: color-mix(in srgb, var(--danger) 12%, var(--surface-solid));
+  border: 1px solid color-mix(in srgb, var(--danger) 40%, var(--line));
 }
 
 .topbar {

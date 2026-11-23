@@ -6,11 +6,13 @@ import ePub, {
 import { useCallback, useEffect, useRef, useState } from "react";
 import { api, fileToBlobUrl } from "../api";
 import type { Annotation, Book } from "../types";
+import { formatInvokeError, type ToastKind } from "./Toast";
 
 interface Props {
   book: Book;
   onClose: () => void;
   onProgress: (book: Book) => void;
+  onNotify?: (kind: ToastKind, text: string) => void;
 }
 
 type ReaderTheme = "light" | "sepia" | "dark";
@@ -34,7 +36,7 @@ const THEME_STYLES: Record<ReaderTheme, Record<string, Record<string, string>>> 
   },
 };
 
-export function EpubReader({ book, onClose, onProgress }: Props) {
+export function EpubReader({ book, onClose, onProgress, onNotify }: Props) {
   const hostRef = useRef<HTMLDivElement>(null);
   const bookRef = useRef<EpubBook | null>(null);
   const renditionRef = useRef<Rendition | null>(null);
@@ -72,7 +74,9 @@ export function EpubReader({ book, onClose, onProgress }: Props) {
     positionReady.current = false;
     (async () => {
       if (!book.filePath || !hostRef.current) {
-        setError("Dosya yolu yok.");
+        const msg = "Dosya yolu yok. EPUB’u yeniden bağlayın.";
+        setError(msg);
+        onNotify?.("error", msg);
         return;
       }
       try {
@@ -137,6 +141,7 @@ export function EpubReader({ book, onClose, onProgress }: Props) {
         }
         positionReady.current = true;
         setReady(true);
+        onNotify?.("success", "EPUB yüklendi.");
 
         rendition.on("relocated", (loc: { start: { cfi: string; percentage?: number } }) => {
           const percentage = Math.round((loc.start.percentage || 0) * 1000) / 10;
@@ -156,7 +161,9 @@ export function EpubReader({ book, onClose, onProgress }: Props) {
           if (text) setNoteText(text);
         });
       } catch (err) {
-        setError(String(err));
+        const msg = `EPUB açılamadı: ${formatInvokeError(err)}`;
+        setError(msg);
+        onNotify?.("error", msg);
       }
     })();
 

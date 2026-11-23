@@ -3,6 +3,7 @@ import * as pdfjs from "pdfjs-dist";
 import pdfWorker from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 import { api, fileToBlobUrl } from "../api";
 import type { Annotation, Book } from "../types";
+import { formatInvokeError, type ToastKind } from "./Toast";
 
 pdfjs.GlobalWorkerOptions.workerSrc = pdfWorker;
 
@@ -10,13 +11,14 @@ interface Props {
   book: Book;
   onClose: () => void;
   onProgress: (book: Book) => void;
+  onNotify?: (kind: ToastKind, text: string) => void;
 }
 
 const ZOOM_MIN = 0.7;
 const ZOOM_MAX = 2.6;
 const ZOOM_STEP = 0.15;
 
-export function PdfReader({ book, onClose, onProgress }: Props) {
+export function PdfReader({ book, onClose, onProgress, onNotify }: Props) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const textLayerRef = useRef<HTMLDivElement>(null);
   const stageRef = useRef<HTMLDivElement>(null);
@@ -45,7 +47,9 @@ export function PdfReader({ book, onClose, onProgress }: Props) {
     positionReady.current = false;
     (async () => {
       if (!book.filePath) {
-        setError("Dosya yolu yok.");
+        const msg = "Dosya yolu yok. PDF’yi yeniden bağlayın.";
+        setError(msg);
+        onNotify?.("error", msg);
         setLoading(false);
         return;
       }
@@ -58,6 +62,9 @@ export function PdfReader({ book, onClose, onProgress }: Props) {
         }
         const doc = await pdfjs.getDocument(url).promise;
         if (cancelled) return;
+        if (!doc.numPages) {
+          throw new Error("PDF sayfa içermiyor (boş veya bozuk dosya).");
+        }
         setPdf(doc);
         setPageCount(doc.numPages);
         const saved = await api.getReadingPosition(book.id);
@@ -78,8 +85,11 @@ export function PdfReader({ book, onClose, onProgress }: Props) {
         setPageInput(String(p));
         setNotes(await api.listAnnotations(book.id));
         positionReady.current = true;
+        onNotify?.("success", `PDF yüklendi · ${doc.numPages} sayfa`);
       } catch (err) {
-        setError(String(err));
+        const msg = `PDF açılamadı: ${formatInvokeError(err)}`;
+        setError(msg);
+        onNotify?.("error", msg);
       } finally {
         if (!cancelled) setLoading(false);
       }

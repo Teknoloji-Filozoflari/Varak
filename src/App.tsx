@@ -1,5 +1,5 @@
 import { open } from "@tauri-apps/plugin-dialog";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { api } from "./api";
 import { BackupPanel } from "./components/BackupPanel";
 import { BookCard } from "./components/BookCard";
@@ -10,6 +10,7 @@ import { ImportPreviewModal } from "./components/ImportPreviewModal";
 import { PdfReader } from "./components/PdfReader";
 import { SettingsPanel } from "./components/SettingsPanel";
 import { StatsPanel } from "./components/StatsPanel";
+import { formatInvokeError, Toast, type ToastState } from "./components/Toast";
 import { isReadableBook, normalizeFileType } from "./lib/books";
 import {
   STATUS_LABELS,
@@ -38,7 +39,12 @@ export default function App() {
   const [settings, setSettings] = useState<AppSettings | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [toast, setToast] = useState<ToastState | null>(null);
   const [importPreview, setImportPreview] = useState<ImportPreview | null>(null);
+
+  const notify = useCallback((kind: ToastState["kind"], text: string) => {
+    setToast({ kind, text });
+  }, []);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -86,16 +92,31 @@ export default function App() {
   }, [books]);
 
   async function importFile() {
-    const selectedPath = await open({
-      multiple: false,
-      filters: [{ name: "Kitap", extensions: ["pdf", "epub"] }],
-    });
-    if (typeof selectedPath !== "string") return;
+    let selectedPath: string | string[] | null;
+    try {
+      selectedPath = await open({
+        multiple: false,
+        filters: [{ name: "Kitap", extensions: ["pdf", "epub"] }],
+      });
+    } catch (err) {
+      notify("error", `Dosya seçilemedi: ${formatInvokeError(err)}`);
+      return;
+    }
+    if (selectedPath == null) {
+      notify("info", "İçe aktarma iptal edildi.");
+      return;
+    }
+    if (typeof selectedPath !== "string") {
+      notify("error", "Geçersiz dosya yolu.");
+      return;
+    }
     try {
       const preview = await api.previewImport(selectedPath);
       setImportPreview(preview);
     } catch (err) {
-      setError(String(err));
+      const msg = formatInvokeError(err);
+      setError(msg);
+      notify("error", `Önizleme başarısız: ${msg}`);
     }
   }
 
@@ -108,64 +129,70 @@ export default function App() {
     if (!isReadableBook(book)) {
       setSelected(book);
       setView("detail");
-      setError(
-        "Bu kitapta okunabilir PDF/EPUB yok. Detayda “PDF/EPUB bağla ve oku” ile dosya ekleyin.",
-      );
+      const msg =
+        "Bu kitapta okunabilir PDF/EPUB yok. Detayda “PDF/EPUB bağla ve oku” ile dosya ekleyin.";
+      setError(msg);
+      notify("error", msg);
       return;
     }
     setError(null);
+    notify("info", `“${book.title}” okuyucuda açılıyor…`);
     setReading(book);
   }
 
   if (reading) {
     const kind = normalizeFileType(reading.fileType);
+    const closeReader = () => {
+      setReading(null);
+      void refresh();
+    };
+    const onProgress = (b: Book) => {
+      setReading(b);
+      setSelected(b);
+    };
+    let reader: ReactNode;
     if (kind === "pdf") {
-      return (
+      reader = (
         <PdfReader
           book={reading}
-          onClose={() => {
-            setReading(null);
-            void refresh();
-          }}
-          onProgress={(b) => {
-            setReading(b);
-            setSelected(b);
-          }}
+          onClose={closeReader}
+          onProgress={onProgress}
+          onNotify={notify}
         />
       );
-    }
-    if (kind === "epub") {
-      return (
+    } else if (kind === "epub") {
+      reader = (
         <EpubReader
           book={reading}
-          onClose={() => {
-            setReading(null);
-            void refresh();
-          }}
-          onProgress={(b) => {
-            setReading(b);
-            setSelected(b);
-          }}
+          onClose={closeReader}
+          onProgress={onProgress}
+          onNotify={notify}
         />
       );
-    }
-    return (
-      <div className="app-shell">
+    } else {
+      reader = (
         <div className="panel" style={{ margin: "2rem auto", maxWidth: 480 }}>
           <h2>Okuyucu açılamadı</h2>
           <p className="muted">
             Desteklenmeyen veya eksik dosya türü: {reading.fileType || "bilinmiyor"}.
           </p>
-          <button className="btn btn-primary" onClick={() => setReading(null)}>
+          <button type="button" className="btn btn-primary" onClick={closeReader}>
             Kütüphaneye dön
           </button>
         </div>
+      );
+    }
+    return (
+      <div className="app-shell">
+        <Toast toast={toast} onClose={() => setToast(null)} />
+        {reader}
       </div>
     );
   }
 
   return (
     <div className="app-shell">
+      <Toast toast={toast} onClose={() => setToast(null)} />
       <header className="topbar">
         <h1 className="brand">
           Var<span>ak</span>
@@ -271,6 +298,7 @@ export default function App() {
                 void refresh();
               }}
               onRead={startReading}
+              onNotify={notify}
               onDeleted={() => {
                 setSelected(null);
                 setView("library");
@@ -329,8 +357,12 @@ export default function App() {
           onImported={(book) => {
             setImportPreview(null);
             setSelected(book);
-            setView("detail");
             void refresh();
+            notify(
+              "success",
+              `“${book.title}” kitaplığa kopyalandı. Okuyucu açılıyor…`,
+            );
+            startReading(book);
           }}
         />
       )}

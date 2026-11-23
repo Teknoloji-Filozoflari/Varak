@@ -6,5 +6,19 @@ export function normalizeFileType(fileType: string | null | undefined): string {
 
 export function isReadableBook(book: Book): boolean {
   const kind = normalizeFileType(book.fileType);
-  return (kind === "pdf" || kind === "epub") && !!book.filePath;
+  return (kind === "pdf" || kind === "epub") && !!book.filePath?.trim();
+}
+
+/** Human-readable Turkish label for file type. */
+export function fileTypeLabel(fileType: string | null | undefined): string {
+  switch (normalizeFileType(fileType)) {
+    case "pdf":
+      return "PDF";
+    case "epub":
+      return "EPUB";
+    case "physical":
+      return "Fiziksel";
+    default:
+      return fileType || "bilinmiyor";
+  }
 }

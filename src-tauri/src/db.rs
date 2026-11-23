@@ -441,6 +441,12 @@ pub fn attach_book_file(conn: &Connection, book_id: &str, source_path: &str) -> 
             ))
         }
     };
+    let meta = fs::metadata(&source)?;
+    if meta.len() == 0 {
+        return Err(DbError::Message(
+            "Seçilen dosya boş (0 bayt). Geçerli bir PDF/EPUB seçin.".into(),
+        ));
+    }
     let file_hash = sha256_file(&source).map_err(DbError::Message)?;
 
     let settings = get_settings(conn, &default_data_dir())?;
@@ -453,7 +459,13 @@ pub fn attach_book_file(conn: &Connection, book_id: &str, source_path: &str) -> 
     }
 
     let dest = library.join(format!("{book_id}.{ext}"));
-    fs::copy(&source, &dest)?;
+    let copied = fs::copy(&source, &dest)?;
+    if copied == 0 {
+        let _ = fs::remove_file(&dest);
+        return Err(DbError::Message(
+            "Dosya kitaplığa kopyalanamadı (0 bayt).".into(),
+        ));
+    }
 
     let mut cover_path = existing.cover_path.clone();
     if matches!(file_type, FileType::Epub) && cover_path.is_none() {
@@ -498,8 +510,13 @@ pub fn preview_import(conn: &Connection, source_path: &str) -> Result<ImportPrev
             ))
         }
     };
-    let file_hash = sha256_file(&source).map_err(DbError::Message)?;
     let file_size = fs::metadata(&source)?.len();
+    if file_size == 0 {
+        return Err(DbError::Message(
+            "Seçilen dosya boş (0 bayt). Geçerli bir PDF/EPUB seçin.".into(),
+        ));
+    }
+    let file_hash = sha256_file(&source).map_err(DbError::Message)?;
 
     let mut title = source
         .file_stem()
@@ -586,7 +603,13 @@ pub fn confirm_import(conn: &Connection, input: ConfirmImport) -> Result<Book, D
     let id = Uuid::new_v4().to_string();
     let dest_name = format!("{id}.{ext}");
     let dest = library.join(&dest_name);
-    fs::copy(&source, &dest)?;
+    let copied = fs::copy(&source, &dest)?;
+    if copied == 0 || preview.file_size == 0 {
+        let _ = fs::remove_file(&dest);
+        return Err(DbError::Message(
+            "Seçilen dosya boş veya kopyalanamadı. Geçerli bir PDF/EPUB seçin.".into(),
+        ));
+    }
 
     let mut cover_path: Option<String> = None;
     if matches!(file_type, FileType::Epub) {
@@ -943,5 +966,53 @@ mod import_tests {
         assert_eq!(book.file_type, "epub");
         let cover = book.cover_path.expect("cover_path");
         assert!(std::path::Path::new(&cover).exists(), "{cover}");
+    }
+
+    #[test]
+    fn attach_copies_nonempty_pdf_into_library() {
+        let src = std::env::temp_dir().join(format!("varak-attach-src-{}.pdf", std::process::id()));
+        let payload = b"%PDF-1.4\n1 0 obj<<>>endobj\ntrailer<<>>\n%%EOF\n";
+        std::fs::write(&src, payload).unwrap();
+
+        let dir = std::env::temp_dir().join(format!("varak-attach-db-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        let conn = open_db(&dir).unwrap();
+        ensure_defaults(&conn, &dir).unwrap();
+        let library = dir.join("library");
+        update_settings(
+            &conn,
+            Some(library.to_string_lossy().to_string()),
+            None,
+        )
+        .unwrap();
+
+        let physical = create_book(
+            &conn,
+            BookInput {
+                title: "Fiziksel sonra PDF".into(),
+                author: Some("Test".into()),
+                isbn: None,
+                status: Some("okunacak".into()),
+                rating: None,
+                review: None,
+                tags: None,
+                cover_path: None,
+            },
+        )
+        .unwrap();
+        assert_eq!(physical.file_type, "physical");
+
+        let attached = attach_book_file(&conn, &physical.id, src.to_str().unwrap()).unwrap();
+        assert_eq!(attached.file_type, "pdf");
+        let path = attached.file_path.expect("file_path");
+        assert!(path.starts_with(library.to_string_lossy().as_ref()));
+        let meta = std::fs::metadata(&path).unwrap();
+        assert_eq!(meta.len() as usize, payload.len());
+        assert_ne!(path, src.to_string_lossy());
+
+        let empty = std::env::temp_dir().join(format!("varak-empty-{}.pdf", std::process::id()));
+        std::fs::write(&empty, b"").unwrap();
+        let err = attach_book_file(&conn, &physical.id, empty.to_str().unwrap()).unwrap_err();
+        assert!(format!("{err}").contains("boş") || format!("{err}").contains("0"));
     }
 }

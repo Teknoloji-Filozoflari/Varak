@@ -1,4 +1,5 @@
 import { convertFileSrc, invoke } from "@tauri-apps/api/core";
+import { readFile } from "@tauri-apps/plugin-fs";
 import type {
   Annotation,
   AnnotationInput,
@@ -76,12 +77,42 @@ export const api = {
   getStatistics: () => invoke<LibraryStats>("get_statistics"),
 };
 
+/**
+ * Load a managed library file into a blob URL for PDF.js / EPUB.js.
+ * Prefer plugin-fs binary read — the old `number[]` IPC path freezes on multi‑MB books.
+ */
 export async function fileToBlobUrl(
   path: string,
   mime: string,
 ): Promise<string> {
-  const bytes = await api.readLibraryFile(path);
-  const buffer = new Uint8Array(bytes);
-  const blob = new Blob([buffer], { type: mime });
-  return URL.createObjectURL(blob);
+  if (!path?.trim()) {
+    throw new Error("Dosya yolu boş.");
+  }
+  try {
+    const bytes = await readFile(path);
+    if (!bytes.byteLength) {
+      throw new Error(
+        "Kitap dosyası boş (0 bayt). PDF/EPUB’u yeniden bağlayın veya içe aktarın.",
+      );
+    }
+    const copy = new Uint8Array(bytes);
+    const blob = new Blob([copy], { type: mime });
+    return URL.createObjectURL(blob);
+  } catch (fsErr) {
+    // Fallback: base64 command (still safer than number[])
+    try {
+      const b64 = await invoke<string>("read_library_file_b64", { path });
+      const binary = atob(b64);
+      const buffer = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i++) buffer[i] = binary.charCodeAt(i);
+      if (!buffer.byteLength) {
+        throw new Error("Kitap dosyası boş (0 bayt).");
+      }
+      return URL.createObjectURL(new Blob([buffer], { type: mime }));
+    } catch (b64Err) {
+      const a = fsErr instanceof Error ? fsErr.message : String(fsErr);
+      const b = b64Err instanceof Error ? b64Err.message : String(b64Err);
+      throw new Error(`Dosya okunamadı: ${a} | ${b}`);
+    }
+  }
 }

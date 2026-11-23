@@ -154,7 +154,26 @@ pub async fn apply_cover_from_url(
 
 #[tauri::command]
 pub fn read_library_file(path: String) -> Result<Vec<u8>, DbError> {
-    std::fs::read(&path).map_err(DbError::from)
+    let bytes = std::fs::read(&path).map_err(DbError::from)?;
+    if bytes.is_empty() {
+        return Err(DbError::Message(
+            "Kitap dosyası boş (0 bayt). PDF/EPUB’u yeniden bağlayın.".into(),
+        ));
+    }
+    Ok(bytes)
+}
+
+/// Base64 payload — preferred over Vec<u8> IPC (JSON number arrays stall large books).
+#[tauri::command]
+pub fn read_library_file_b64(path: String) -> Result<String, DbError> {
+    use base64::Engine;
+    let bytes = std::fs::read(&path).map_err(DbError::from)?;
+    if bytes.is_empty() {
+        return Err(DbError::Message(
+            "Kitap dosyası boş (0 bayt). PDF/EPUB’u yeniden bağlayın.".into(),
+        ));
+    }
+    Ok(base64::engine::general_purpose::STANDARD.encode(bytes))
 }
 
 #[tauri::command]
